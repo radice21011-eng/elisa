@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Simple email-based access (No verification required)
   app.post('/api/auth/access', async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, password } = req.body;
       
       if (!email || typeof email !== 'string') {
         return res.status(400).json({ message: 'Email is required' });
@@ -55,6 +55,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: 'ACCESS DENIED - ELISA Quantum AI Council',
           details: 'Unauthorized email. Violations tracked and subject to $1 billion fine.'
         });
+      }
+
+      // Special password check for ervin210@icloud.com
+      if (email.toLowerCase() === 'ervin210@icloud.com') {
+        if (!password || password !== 'Elonmusksuge') {
+          return res.status(403).json({
+            message: 'ACCESS DENIED - Invalid credentials',
+            details: 'Password required for this account.'
+          });
+        }
       }
 
       // Generate access token for authorized user

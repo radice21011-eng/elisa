@@ -43,6 +43,32 @@ export function useAuth() {
 
   const isELISAOwner = user?.email === 'ervin210@icloud.com';
 
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await fetch('/api/auth/access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        localStorage.setItem('elisa_token', data.token);
+        localStorage.setItem('elisa_user', JSON.stringify(data.user));
+        setUser(data.user);
+        return { success: true };
+      } else {
+        return { success: false, error: data.message || 'Login failed' };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error: 'Network error' };
+    }
+  };
+
   return {
     user,
     isLoading,
@@ -51,6 +77,6 @@ export function useAuth() {
     hasRole,
     isELISAOwner,
     token: localStorage.getItem('elisa_token'),
-    login: () => {} // Placeholder for compatibility
+    login
   };
 }
