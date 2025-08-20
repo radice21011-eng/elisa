@@ -159,7 +159,7 @@ function SystemConfigTab() {
 
       {/* Current Config */}
       <div className="space-y-3">
-        {config.map((item: Config) => (
+        {(config as Config[])?.map((item: Config) => (
           <div key={item.id} className="bg-black/40 border border-purple-500/30 rounded-lg p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -319,7 +319,7 @@ function AuditLogsTab() {
                 </div>
                 {log.details && (
                   <pre className="text-xs bg-gray-900/50 p-2 rounded overflow-x-auto">
-                    {JSON.stringify(log.details, null, 2)}
+                    {JSON.stringify(log.details as any, null, 2)}
                   </pre>
                 )}
               </div>

@@ -18,7 +18,7 @@ export default function RealTimeMetrics() {
   });
 
   useEffect(() => {
-    setRealtimeMetrics(initialMetrics);
+    setRealtimeMetrics(initialMetrics as any[]);
   }, [initialMetrics]);
 
   // Handle real-time updates
