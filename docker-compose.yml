@@ -1,0 +1,243 @@
+# 🐳 ELISA Quantum AI Council - Docker Compose Configuration
+# Production-ready containerized deployment
+
+version: '3.8'
+
+services:
+  # ===============================================================================
+  # ELISA Quantum AI Application
+  # ===============================================================================
+  elisa-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: elisa-quantum-ai:latest
+    container_name: elisa-quantum-ai
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://elisa_user:${POSTGRES_PASSWORD}@elisa-postgres:5432/elisa_db
+      - JWT_SECRET=${JWT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ELISA_OWNER_EMAIL=ervin210@icloud.com
+      - ELISA_BACKUP_EMAIL=radosavlevici.ervin@gmail.com
+    depends_on:
+      elisa-postgres:
+        condition: service_healthy
+      elisa-redis:
+        condition: service_healthy
+    volumes:
+      - elisa-logs:/app/logs
+      - elisa-uploads:/app/uploads
+    networks:
+      - elisa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # ===============================================================================
+  # PostgreSQL Database
+  # ===============================================================================
+  elisa-postgres:
+    image: postgres:14-alpine
+    container_name: elisa-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=elisa_db
+      - POSTGRES_USER=elisa_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - elisa-postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - elisa-network
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elisa_user -d elisa_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.3'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # ===============================================================================
+  # Redis Cache & Session Store
+  # ===============================================================================
+  elisa-redis:
+    image: redis:7-alpine
+    container_name: elisa-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - elisa-redis-data:/data
+    networks:
+      - elisa-network
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # ===============================================================================
+  # Nginx Reverse Proxy & Load Balancer
+  # ===============================================================================
+  elisa-nginx:
+    image: nginx:alpine
+    container_name: elisa-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - elisa-logs:/var/log/nginx
+    depends_on:
+      - elisa-app
+    networks:
+      - elisa-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+
+  # ===============================================================================
+  # Monitoring & Observability
+  # ===============================================================================
+  elisa-prometheus:
+    image: prom/prometheus:latest
+    container_name: elisa-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - elisa-prometheus-data:/prometheus
+    networks:
+      - elisa-network
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.2'
+
+  elisa-grafana:
+    image: grafana/grafana:latest
+    container_name: elisa-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - elisa-grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - elisa-network
+    ports:
+      - "3000:3000"
+    depends_on:
+      - elisa-prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
+
+# ===============================================================================
+# Network Configuration
+# ===============================================================================
+networks:
+  elisa-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ===============================================================================
+# Volume Configuration
+# ===============================================================================
+volumes:
+  elisa-postgres-data:
+    driver: local
+  elisa-redis-data:
+    driver: local
+  elisa-logs:
+    driver: local
+  elisa-uploads:
+    driver: local
+  elisa-prometheus-data:
+    driver: local
+  elisa-grafana-data:
+    driver: local
+
+# ===============================================================================
+# Usage Commands:
+# 
+# Development:
+# docker-compose -f docker-compose.yml up -d
+# 
+# Production:
+# docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# 
+# Monitoring:
+# docker-compose logs -f elisa-app
+# docker-compose ps
+# docker-compose exec elisa-app sh
+# 
+# Backup:
+# docker-compose exec elisa-postgres pg_dump -U elisa_user elisa_db > backup.sql
+# 
+# Restore:
+# docker-compose exec -T elisa-postgres psql -U elisa_user elisa_db < backup.sql
+# ===============================================================================
