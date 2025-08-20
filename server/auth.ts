@@ -13,8 +13,8 @@ export interface AuthenticatedRequest extends Request {
 }
 
 // Generate JWT token
-export function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+export function generateToken(userId: string, email?: string): string {
+  return jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
 // Verify JWT token

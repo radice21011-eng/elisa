@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/home";
-import Login from "@/pages/login";
+import Access from "@/pages/access";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,12 +24,12 @@ function Router() {
       {user ? (
         <>
           <Route path="/" component={Home} />
-          <Route path="/login" component={() => <Home />} />
+          <Route path="/access" component={() => <Home />} />
         </>
       ) : (
         <>
-          <Route path="/login" component={Login} />
-          <Route path="/" component={Login} />
+          <Route path="/access" component={Access} />
+          <Route path="/" component={Access} />
         </>
       )}
       <Route component={NotFound} />

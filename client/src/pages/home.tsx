@@ -10,7 +10,7 @@ export default function HomePage() {
   const { isConnected, connectionStatus, lastMessage } = useWebSocket();
   const [showAdminPanel, setShowAdminPanel] = useState(false);
 
-  if (!user || !isELISAOwner()) {
+  if (!user || !isELISAOwner) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-pink-900 text-white flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-black/90 backdrop-blur-lg border-2 border-red-500 rounded-2xl p-8 text-center animate-pulse-glow">

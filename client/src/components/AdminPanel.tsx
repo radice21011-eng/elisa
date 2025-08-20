@@ -317,9 +317,9 @@ function AuditLogsTab() {
                   </span>
                   <span className="text-gray-400 text-sm">{log.resource}</span>
                 </div>
-                {log.details && (
+                {log.details && typeof log.details === 'object' && (
                   <pre className="text-xs bg-gray-900/50 p-2 rounded overflow-x-auto">
-                    {JSON.stringify(log.details as any, null, 2)}
+                    {JSON.stringify(log.details, null, 2)}
                   </pre>
                 )}
               </div>

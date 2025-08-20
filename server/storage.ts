@@ -24,6 +24,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getOrCreateUserByEmail(email: string): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLastLogin(id: string): Promise<void>;
   
@@ -65,6 +66,31 @@ export class DatabaseStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
+  }
+
+  async getOrCreateUserByEmail(email: string): Promise<User> {
+    // First try to get existing user
+    let user = await this.getUserByEmail(email);
+    
+    if (!user) {
+      // Create new user with appropriate role based on email
+      const role = email === 'ervin210@icloud.com' ? 'super_admin' : 
+                  email === 'radosavlevici.ervin@gmail.com' ? 'admin' : 'user';
+      
+      user = await this.createUser({
+        email,
+        role,
+        password: '' // No password required for email-based access
+      });
+      
+      // Update last login separately 
+      await this.updateUserLastLogin(user.id);
+    } else {
+      // Update last login
+      await this.updateUserLastLogin(user.id);
+    }
+    
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

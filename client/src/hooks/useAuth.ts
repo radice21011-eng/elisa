@@ -1,104 +1,56 @@
 import { useState, useEffect } from 'react';
-import { apiRequest } from '@/lib/queryClient';
-import { User } from '@shared/schema';
 
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
+interface User {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
 }
 
 export function useAuth() {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    token: localStorage.getItem('elisa_token'),
-    isLoading: true,
-    isAuthenticated: false
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check for existing auth token and user data
     const token = localStorage.getItem('elisa_token');
-    if (token) {
-      fetchCurrentUser(token);
-    } else {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+    const userData = localStorage.getItem('elisa_user');
+    
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        localStorage.removeItem('elisa_token');
+        localStorage.removeItem('elisa_user');
+      }
     }
+    
+    setIsLoading(false);
   }, []);
 
-  const fetchCurrentUser = async (token: string) => {
-    try {
-      const user = await apiRequest('/api/auth/me');
-      
-      setAuthState({
-        user,
-        token,
-        isLoading: false,
-        isAuthenticated: true
-      });
-    } catch (error) {
-      localStorage.removeItem('elisa_token');
-      setAuthState({
-        user: null,
-        token: null,
-        isLoading: false,
-        isAuthenticated: false
-      });
-    }
+  const logout = () => {
+    localStorage.removeItem('elisa_token');
+    localStorage.removeItem('elisa_user');
+    setUser(null);
+    window.location.href = '/access';
   };
 
-  const login = async (email: string, password: string) => {
-    try {
-      const response = await apiRequest('/api/auth/login', {
-        method: 'POST',
-        body: { email, password }
-      });
-
-      localStorage.setItem('elisa_token', response.token);
-      setAuthState({
-        user: response.user,
-        token: response.token,
-        isLoading: false,
-        isAuthenticated: true
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || 'Authentication failed' 
-      };
-    }
+  const hasRole = (role: string) => {
+    return user?.role === role || user?.role === 'super_admin';
   };
 
-  const logout = async () => {
-    try {
-      if (authState.token) {
-        await apiRequest('/api/auth/logout', {
-          method: 'POST'
-        });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem('elisa_token');
-      setAuthState({
-        user: null,
-        token: null,
-        isLoading: false,
-        isAuthenticated: false
-      });
-    }
-  };
+  const isELISAOwner = user?.email === 'ervin210@icloud.com';
 
   return {
-    ...authState,
-    login,
+    user,
+    isLoading,
+    isAuthenticated: !!user,
     logout,
-    hasRole: (role: string) => authState.user?.role === role,
-    isELISAOwner: () => {
-      const allowedEmails = ['ervin210@icloud.com', 'radosavlevici.ervin@gmail.com'];
-      return authState.user ? allowedEmails.includes(authState.user.email) : false;
-    }
+    hasRole,
+    isELISAOwner,
+    token: localStorage.getItem('elisa_token'),
+    login: () => {} // Placeholder for compatibility
   };
 }
