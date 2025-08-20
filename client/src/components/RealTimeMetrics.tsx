@@ -12,7 +12,7 @@ interface MetricsDisplayProps {
 export default function RealTimeMetrics() {
   const [realtimeMetrics, setRealtimeMetrics] = useState<Metric[]>([]);
   const { lastMessage } = useWebSocket();
-  
+
   const { data: initialMetrics = [] } = useQuery({
     queryKey: ['/api/metrics']
   });
@@ -46,10 +46,10 @@ export default function RealTimeMetrics() {
   const getTrend = (type: string) => {
     const typeMetrics = groupedMetrics[type]?.slice(0, 5) || [];
     if (typeMetrics.length < 2) return 'stable';
-    
+
     const recent = typeMetrics[0]?.value || 0;
     const previous = typeMetrics[1]?.value || 0;
-    
+
     if (recent > previous) return 'up';
     if (recent < previous) return 'down';
     return 'stable';
@@ -109,7 +109,7 @@ export default function RealTimeMetrics() {
             cyan: 'border-cyan-500 bg-cyan-900/20',
             green: 'border-green-500 bg-green-900/20'
           };
-          
+
           const textColors = {
             red: 'text-red-400',
             yellow: 'text-yellow-400', 
@@ -127,18 +127,18 @@ export default function RealTimeMetrics() {
                   {trend === 'stable' && <div className="w-4 h-4 bg-gray-400 rounded-full opacity-50" />}
                 </div>
               </div>
-              
+
               <div className="mb-2">
                 <div className={`text-2xl font-bold ${textColors[config.color as keyof typeof textColors]}`}>
                   {latest.toLocaleString()}
                 </div>
                 <div className="text-white font-semibold text-sm">{config.label}</div>
               </div>
-              
+
               <div className="text-xs text-gray-400">
                 {config.description}
               </div>
-              
+
               {groupedMetrics[config.type]?.[0] && (
                 <div className="text-xs text-gray-500 mt-2">
                   Last update: {new Date(groupedMetrics[config.type][0].timestamp!).toLocaleTimeString()}

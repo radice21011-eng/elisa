@@ -27,27 +27,29 @@ export interface IStorage {
   getOrCreateUserByEmail(email: string): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLastLogin(id: string): Promise<void>;
-  
+  getAllUsers(): Promise<User[]>;
+
   // Session operations
   createSession(userId: string, token: string, expiresAt: Date): Promise<Session>;
   getSession(token: string): Promise<Session | undefined>;
   deleteSession(token: string): Promise<void>;
   cleanupExpiredSessions(): Promise<void>;
-  
+
   // Metrics operations
   createMetric(metric: InsertMetric): Promise<Metric>;
   getMetrics(type?: string, fromDate?: Date, toDate?: Date): Promise<Metric[]>;
   getLatestMetrics(): Promise<Metric[]>;
-  
+
   // Config operations
   getConfig(key: string): Promise<Config | undefined>;
   setConfig(configData: InsertConfig, userId: string): Promise<Config>;
   getAllConfig(): Promise<Config[]>;
-  
+  updateConfig(key: string, value: any): Promise<Config>;
+
   // Audit log operations
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(userId?: string, fromDate?: Date, toDate?: Date): Promise<AuditLog[]>;
-  
+
   // AI Model operations
   createAIModel(model: InsertAIModel): Promise<AIModel>;
   getAIModels(): Promise<AIModel[]>;
@@ -71,25 +73,25 @@ export class DatabaseStorage implements IStorage {
   async getOrCreateUserByEmail(email: string): Promise<User> {
     // First try to get existing user
     let user = await this.getUserByEmail(email);
-    
+
     if (!user) {
       // Create new user with appropriate role based on email
-      const role = email === 'ervin210@icloud.com' ? 'super_admin' : 
+      const role = email === 'ervin210@icloud.com' ? 'super_admin' :
                   email === 'radosavlevici.ervin@gmail.com' ? 'admin' : 'user';
-      
+
       user = await this.createUser({
         email,
         role,
         password: '' // No password required for email-based access
       });
-      
-      // Update last login separately 
+
+      // Update last login separately
       await this.updateUserLastLogin(user.id);
     } else {
       // Update last login
       await this.updateUserLastLogin(user.id);
     }
-    
+
     return user;
   }
 
@@ -106,6 +108,17 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ lastLogin: new Date() })
       .where(eq(users.id, id));
+  }
+
+  async getAllUsers() {
+    return db.select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      isActive: users.isActive,
+      createdAt: users.createdAt,
+      lastLoginAt: users.lastLoginAt
+    }).from(users);
   }
 
   // Session operations
@@ -147,7 +160,7 @@ export class DatabaseStorage implements IStorage {
     if (type) conditions.push(eq(metrics.type, type));
     if (fromDate) conditions.push(gte(metrics.timestamp, fromDate));
     if (toDate) conditions.push(lte(metrics.timestamp, toDate));
-    
+
     if (conditions.length > 0) {
       return db.select().from(metrics).where(and(...conditions)).orderBy(desc(metrics.timestamp));
     } else {
@@ -187,8 +200,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllConfig(): Promise<Config[]> {
-    return db.select().from(config).orderBy(config.key);
+    return db.select().from(config);
   }
+
+  async updateConfig(key: string, value: any) {
+    const [updated] = await db.update(config)
+      .set({ value: JSON.stringify(value), updatedAt: new Date() })
+      .where(eq(config.key, key))
+      .returning();
+
+    if (!updated) {
+      // Create if doesn't exist
+      const [created] = await db.insert(config)
+        .values({ key, value: JSON.stringify(value) })
+        .returning();
+      return created;
+    }
+
+    return updated;
+  }
+
 
   // Audit log operations
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
@@ -204,7 +235,7 @@ export class DatabaseStorage implements IStorage {
     if (userId) conditions.push(eq(auditLogs.userId, userId));
     if (fromDate) conditions.push(gte(auditLogs.timestamp, fromDate));
     if (toDate) conditions.push(lte(auditLogs.timestamp, toDate));
-    
+
     if (conditions.length > 0) {
       return db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.timestamp));
     } else {
@@ -213,16 +244,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // AI Model operations
-  async createAIModel(model: InsertAIModel): Promise<AIModel> {
-    const [aiModel] = await db
-      .insert(aiModels)
-      .values(model)
+  async createAIModel(modelData: any) {
+    const [model] = await db.insert(aiModels)
+      .values({
+        ...modelData,
+        id: crypto.randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
       .returning();
-    return aiModel;
+    return model;
   }
 
   async getAIModels(): Promise<AIModel[]> {
-    return db.select().from(aiModels).orderBy(aiModels.name);
+    return db.select().from(aiModels);
   }
 
   async getAIModel(id: string): Promise<AIModel | undefined> {
@@ -230,13 +265,12 @@ export class DatabaseStorage implements IStorage {
     return aiModel || undefined;
   }
 
-  async updateAIModel(id: string, updates: Partial<InsertAIModel>): Promise<AIModel> {
-    const [aiModel] = await db
-      .update(aiModels)
-      .set({ ...updates, updatedAt: new Date() })
+  async updateAIModel(id: string, updateData: any): Promise<AIModel> {
+    const [updated] = await db.update(aiModels)
+      .set({ ...updateData, updatedAt: new Date() })
       .where(eq(aiModels.id, id))
       .returning();
-    return aiModel;
+    return updated;
   }
 
   async deleteAIModel(id: string): Promise<void> {

@@ -127,6 +127,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update config
+  app.put('/api/config', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { key, value } = req.body;
+      const config = await storage.updateConfig(key, value);
+      res.json(config);
+    } catch (error) {
+      console.error('Error updating config:', error);
+      res.status(500).json({ message: 'Failed to update config' });
+    }
+  });
+
+  // ===== ADMIN ROUTES =====
+  
+  // Get admin config
+  app.get('/api/admin/config', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const config = await storage.getAllConfig();
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching admin config:', error);
+      res.status(500).json({ message: 'Failed to fetch admin config' });
+    }
+  });
+
+  // Get all users (admin only)
+  app.get('/api/admin/users', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  // ===== AI MODELS ROUTES =====
+  
+  // Get all AI models
+  app.get('/api/ai-models', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const models = await storage.getAllAIModels();
+      res.json(models);
+    } catch (error) {
+      console.error('Error fetching AI models:', error);
+      res.status(500).json({ message: 'Failed to fetch AI models' });
+    }
+  });
+
+  // Create AI model
+  app.post('/api/ai-models', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const modelData = req.body;
+      const model = await storage.createAIModel({
+        ...modelData,
+        userId: req.userId
+      });
+      res.status(201).json(model);
+    } catch (error) {
+      console.error('Error creating AI model:', error);
+      res.status(500).json({ message: 'Failed to create AI model' });
+    }
+  });
+
+  // Update AI model
+  app.put('/api/ai-models/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      const model = await storage.updateAIModel(id, updateData);
+      res.json(model);
+    } catch (error) {
+      console.error('Error updating AI model:', error);
+      res.status(500).json({ message: 'Failed to update AI model' });
+    }
+  });
+
+  // Delete AI model
+  app.delete('/api/ai-models/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteAIModel(id);
+      res.json({ message: 'AI model deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting AI model:', error);
+      res.status(500).json({ message: 'Failed to delete AI model' });
+    }
+  });
+
+  // ===== EXPORT ROUTES =====
+  
+  // Export metrics
+  app.get('/api/export/metrics', authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const metrics = await storage.getLatestMetrics();
+      res.json({
+        exported_at: new Date().toISOString(),
+        data: metrics,
+        format: 'json'
+      });
+    } catch (error) {
+      console.error('Error exporting metrics:', error);
+      res.status(500).json({ message: 'Failed to export metrics' });
+    }
+  });
+
   // ===== AUDIT LOG ROUTES =====
   
   // Get audit logs
